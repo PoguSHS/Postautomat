@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poststation-Simulator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Layout: Automat links mit Touchscreen, Geräten und Fächern, darunter „Deine Sachen“ zum Ziehen; rechts Protokoll und Codetabelle */
+:root{
+  --bg:#eef2f6; --panel:#ffffff; --surface2:#f4f6f9; --shadow:0 1px 2px rgba(31,45,58,.06),0 8px 24px rgba(31,45,58,.08); --fg:#1f2d3a; --muted:#4f5d6b; --line:#d5dbe1;
+  --accent:#d0534a; --accent-ink:#ffffff;
+  --in:#2557b8; --in-bg:#e6eefb;
+  --st:#6c3f9c; --st-bg:#efe7f8;
+  --ok:#237a40; --ok-bg:#e3f3e8;
+  --bad:#b8443b; --bad-bg:#fde3e1;
+  --machine:#ffcc00; --machine-dark:#e6b200; --machine-edge:#c99a00; --door:#f7d84a;
+  --screen-frame:#1f2d3a; --screen-bg:#f4f8ff; --screen-fg:#1f2d3a; --screen-btn:#2557b8;
+  --display:"Fredoka","Nunito",system-ui,sans-serif;
+  --body:"Nunito","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171d; --panel:#1c232b; --surface2:#232c36; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.35); --fg:#e8edf2; --muted:#a9b5c1; --line:#36414d;
+  --accent:#e4685f; --accent-ink:#1a0f0e;
+  --in:#8fb2f2; --in-bg:#22314d; --st:#c4a4ea; --st-bg:#33264a;
+  --ok:#7fd49a; --ok-bg:#1d3a27; --bad:#f19b93; --bad-bg:#4a2422;
+  --machine:#e8b900; --machine-dark:#cc9e00; --machine-edge:#a17a00; --door:#e6c53c;
+  --screen-frame:#0d1217;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171d; --panel:#1c232b; --surface2:#232c36; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.35); --fg:#e8edf2; --muted:#a9b5c1; --line:#36414d;
+  --accent:#e4685f; --accent-ink:#1a0f0e;
+  --in:#8fb2f2; --in-bg:#22314d; --st:#c4a4ea; --st-bg:#33264a;
+  --ok:#7fd49a; --ok-bg:#1d3a27; --bad:#f19b93; --bad-bg:#4a2422;
+  --machine:#e8b900; --machine-dark:#cc9e00; --machine-edge:#a17a00; --door:#e6c53c;
+  --screen-frame:#0d1217;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0}[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1200px;margin:0 auto;padding-block:24px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;background:var(--panel);border-radius:20px;padding:18px 20px;box-shadow:var(--shadow)}
+.titleblock{display:flex;align-items:center;gap:14px;min-width:0}
+.logo{flex:0 0 52px;width:52px;height:52px}
+.lead{margin:2px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{margin:0;font-family:var(--display);font-weight:600;font-size:clamp(26px,3.6vw,36px);line-height:1.1;text-wrap:balance}
+h2{margin:0;font-family:var(--display);font-weight:600;font-size:20px}
+.modes{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;padding:3px;background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--fg);font:700 14px var(--body);padding:7px 14px;border-radius:999px;cursor:pointer;min-height:38px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.toggle{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:var(--muted);cursor:pointer}
+.hint{font-size:14px;color:var(--muted);margin:0}
+.modehint{margin:0;align-self:flex-start;background:var(--st-bg);color:var(--fg);border-radius:999px;padding:7px 16px;font-size:14px;font-weight:700}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:940px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:0;border-radius:20px;padding:20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px;min-width:0}
+.label{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+/* ---------- Automat ---------- */
+.station{display:flex;flex-direction:column;filter:drop-shadow(0 14px 18px rgba(31,45,58,.18))}
+.roof{background:var(--machine-dark);border-radius:18px 18px 0 0;padding:9px 14px;display:flex;justify-content:center}
+.sign{background:#1f2d3a;color:#ffcc00;font:600 14px var(--display);letter-spacing:.06em;border-radius:6px;padding:4px 14px;text-transform:uppercase}
+.plinth{height:14px;margin:0 10px;background:#7d8b98;border-radius:0 0 8px 8px}
+.machine{background:var(--machine);border-radius:0;padding:16px 14px 14px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:14px;}
+@media (max-width:560px){.machine{grid-template-columns:minmax(0,1fr)}}
+.console{background:var(--machine-dark);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:10px}
+.brand{font:800 11px var(--body);color:#5a4500;letter-spacing:.08em;text-transform:uppercase}
+.screen{background:var(--screen-frame);border-radius:10px;padding:9px}
+.screen-in{background:var(--screen-bg);color:var(--screen-fg);border-radius:5px;min-height:206px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.scr-title{font:600 18px var(--display);line-height:1.2}
+.scr-text{font-size:13.5px;line-height:1.4;color:#3c4a57}
+.scr-btns{display:flex;flex-direction:column;gap:7px;margin-top:auto}
+.tbtn{display:flex;align-items:center;gap:10px;width:100%;border:0;border-radius:10px;background:var(--screen-btn);color:#fff;font:800 15px var(--body);padding:10px 12px;cursor:pointer;text-align:left;min-height:46px;box-shadow:0 3px 0 #173c85}
+.tbtn:active{transform:translateY(2px);box-shadow:0 1px 0 #173c85}
+.tbtn.sec{background:#e6eefb;color:#1f2d3a;box-shadow:0 3px 0 #b9c9e6}
+.tkey{flex:0 0 26px;height:26px;border-radius:13px;background:#fff;color:#2557b8;font:600 16px var(--display);display:inline-flex;align-items:center;justify-content:center}
+.sig{background:#fff;border:1.5px dashed #9aa7b3;border-radius:6px;width:100%;height:74px;touch-action:none;display:block;cursor:crosshair}
+.hw{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dev{background:var(--machine-edge);border:2px solid transparent;border-radius:10px;padding:8px;color:#1f2d3a;font-size:12.5px;font-weight:800;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:72px;transition:background .2s,border-color .2s;position:relative}
+.dev.drop{border-color:#2557b8;border-style:dashed;background:#f0c21d}
+.dev.lit{background:#fff3b0;box-shadow:0 0 0 3px #2557b8}
+.dev .slot{width:72%;height:7px;border-radius:4px;background:#1f2d3a}
+.laser{width:72%;height:16px;border-radius:4px;background:#1f2d3a;position:relative;overflow:hidden}
+.laser::after{content:"";position:absolute;left:6%;right:6%;top:7px;height:2px;background:#ff4d4d;box-shadow:0 0 6px #ff4d4d}
+.dev.lit .laser::after{animation:scan .45s ease-in-out}
+@keyframes scan{0%{top:2px}50%{top:12px}100%{top:7px}}
+.ticket{background:#fff;border:1.5px dashed #9aa7b3;color:#1f2d3a;border-radius:4px;font-size:11px;font-weight:800;padding:3px 7px;animation:print .5s ease-out}
+@keyframes print{from{transform:translateY(-8px);opacity:0}to{transform:none;opacity:1}}
+.faecher{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;align-content:start}
+.fach{position:relative;min-height:64px;border-radius:6px;background:#2b3742;border:2px solid var(--machine-edge);perspective:600px;cursor:pointer;padding:0}
+.fach.big{grid-column:span 3;min-height:56px}
+.fach .inside{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.fach .door{position:absolute;inset:0;background:linear-gradient(180deg,var(--door),#efcd36);border-radius:4px;transform-origin:left center;transition:transform .55s cubic-bezier(.3,.7,.3,1);display:flex;align-items:flex-start;justify-content:flex-start;padding:3px 6px;font-size:11px;font-weight:800;color:#6b5300;box-shadow:inset -5px 0 0 rgba(0,0,0,.08)}
+.fach .door::after{content:"";position:absolute;right:7px;top:50%;width:5px;height:5px;margin-top:-2px;border-radius:50%;background:#c99a00}
+.fach.open{border-color:#2557b8;box-shadow:0 0 0 3px #2557b8}
+.fach.open .door{transform:rotateY(-105deg)}
+.fach.drop{outline:3px dashed #2557b8;outline-offset:2px}
+.parcel{width:34px;height:26px;border-radius:3px;background:#c08a4a;box-shadow:inset 0 -7px 0 #a5733a;position:relative}
+.parcel::before{content:"";position:absolute;left:14px;top:0;bottom:0;width:6px;background:#e3c08f}
+.msg{min-height:24px;font-size:14px;font-weight:700;color:var(--in)}
+
+/* Deine Sachen */
+.counter{display:flex;flex-direction:column;gap:8px;background:var(--surface2);border-radius:16px;padding:14px}
+.tray{display:flex;flex-wrap:wrap;gap:10px}
+.item{display:flex;flex-direction:column;align-items:center;gap:4px;width:108px;padding:10px 6px 8px;border:1.5px solid var(--line);border-radius:14px;box-shadow:0 2px 0 var(--line);transition:transform .15s;background:var(--panel);color:var(--fg);font:800 12.5px var(--body);text-align:center;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.item:hover{border-color:var(--in);transform:translateY(-2px)}
+.item.sel{border-color:var(--in);box-shadow:0 0 0 3px var(--in-bg);background:var(--in-bg)}
+.item.got{cursor:default;border-style:dashed;background:var(--ok-bg);color:var(--ok)}
+.item svg{width:54px;height:40px}
+.ghost{position:fixed;left:0;top:0;z-index:50;pointer-events:none;opacity:.92;transform:translate(-50%,-60%)}
+.item:focus-visible,.tbtn:focus-visible,.fach:focus-visible,.btn:focus-visible,.seg button:focus-visible,input:focus-visible{outline:3px solid var(--in);outline-offset:2px}
+
+/* Protokoll */
+.word{display:flex;flex-wrap:wrap;gap:6px;min-height:48px;align-items:center;padding:8px;border:1.5px dashed var(--line);border-radius:12px}
+.word .ch{width:34px;height:34px;border-radius:8px;background:var(--in-bg);color:var(--in);font:600 20px var(--display);display:inline-flex;align-items:center;justify-content:center}
+.word .ch.badch{background:var(--bad-bg);color:var(--bad);text-decoration:line-through}
+.word .empty{color:var(--muted);font-size:14px}
+.state{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pill{border-radius:999px;padding:5px 14px;font-weight:800;font-size:15px}
+.pill.st{background:var(--st-bg);color:var(--st);border:1.5px solid var(--st)}
+.pill.end{background:var(--bad-bg);color:var(--bad);border:3px double var(--bad)}
+.status{border-radius:12px;padding:12px 14px;font-weight:700;display:flex;gap:10px;align-items:flex-start}
+.status .icon{font:600 20px var(--display);line-height:1}
+.status.run{background:var(--in-bg);color:var(--fg)}
+.status.ok{background:var(--ok-bg);color:var(--ok)}
+.status.bad{background:var(--bad-bg);color:var(--bad)}
+.path{font-size:13.5px;color:var(--muted);overflow-wrap:anywhere;margin:0}
+.btn{border:0;border-radius:12px;padding:10px 16px;font:800 14px var(--body);cursor:pointer;min-height:44px;background:var(--accent);color:var(--accent-ink)}
+.btn.ghostbtn{background:transparent;color:var(--fg);border:1.5px solid var(--line)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px}
+@media (max-width:420px){.codes{grid-template-columns:minmax(0,1fr)}}
+.code{display:flex;align-items:center;gap:9px;font-size:13.5px;line-height:1.3;padding:3px 4px;border-radius:8px;transition:background .3s}
+.code.last{background:var(--in-bg)}
+.code.off{opacity:.4}
+.key{flex:0 0 28px;height:28px;border-radius:14px;background:var(--in);color:var(--panel);font:600 16px var(--display);display:inline-flex;align-items:center;justify-content:center}
+.test{display:flex;gap:8px;flex-wrap:wrap}
+.test input{flex:1 1 160px;min-width:0;border:1.5px solid var(--line);background:var(--panel);color:var(--fg);border-radius:12px;padding:10px 12px;font:600 18px var(--display);letter-spacing:.12em}
+hr{border:0;border-top:1.5px solid var(--line);margin:2px 0;width:100%}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="titleblock">
+      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="6" width="40" height="38" rx="6" fill="#ffcc00"/><rect x="4" y="6" width="40" height="7" rx="3" fill="#e6b200"/><rect x="9" y="17" width="13" height="10" rx="2" fill="#1f2d3a"/><rect x="11" y="19" width="9" height="6" rx="1" fill="#e6eefb"/><g fill="#f7d84a" stroke="#c99a00" stroke-width="1.5"><rect x="26" y="17" width="7" height="7" rx="1"/><rect x="35" y="17" width="5" height="7" rx="1"/><rect x="26" y="27" width="14" height="6" rx="1"/><rect x="26" y="35" width="14" height="5" rx="1"/></g><rect x="10" y="31" width="11" height="3" rx="1.5" fill="#1f2d3a"/></svg>
+      <div>
+        <h1>Poststation-Simulator</h1>
+        <p class="lead">Bediene die Poststation wie in echt: Berühre den Bildschirm und halte deine Sachen an den Automaten.</p>
+      </div>
+    </div>
+    <div class="modes">
+      <div class="seg" role="group" aria-label="Stufe wählen">
+        <button type="button" id="mode1" aria-pressed="true">Stufe 1</button>
+        <button type="button" id="mode2" aria-pressed="false">Stufe 2</button>
+      </div>
+      <label class="toggle" for="showState"><input type="checkbox" id="showState" checked> Zustand anzeigen</label>
+    </div>
+  </header>
+  <p class="modehint" id="modeHint"></p>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="hMachine">
+      <h2 id="hMachine">Die Poststation</h2>
+      <div class="station"><div class="roof"><span class="sign">Poststation · rund um die Uhr</span></div>
+      <div class="machine">
+        <div class="console">
+          <div class="brand">Bildschirm berühren</div>
+          <div class="screen"><div class="screen-in" id="screen" aria-live="polite"></div></div>
+          <div class="hw">
+            <div class="dev" id="devScan" data-target="scan" role="button" tabindex="0" aria-label="Scanner">Scanner<span class="laser"></span></div>
+            <div class="dev" id="devCard" data-target="card" role="button" tabindex="0" aria-label="Kartenterminal">Kartenterminal<span class="slot" style="width:42%"></span></div>
+            <div class="dev" id="devPrint" aria-label="Drucker">Drucker<span id="ticket"></span></div>
+            <div class="dev" id="devMail" data-target="mail" role="button" tabindex="0" aria-label="Briefkasten">Briefkasten<span class="slot"></span></div>
+          </div>
+        </div>
+        <div class="faecher" id="faecher" aria-label="Paketfächer"></div>
+      </div><div class="plinth"></div></div>
+      <div class="msg" id="msg" aria-live="polite"></div>
+
+      <div class="counter">
+        <span class="label">Deine Sachen</span>
+        <p class="hint">Ziehe einen Gegenstand auf den Automaten – oder tippe ihn an und danach auf Scanner, Kartenterminal, Briefkasten oder Fach.</p>
+        <div class="tray" id="tray"></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="hLog">
+      <h2 id="hLog">Was ist passiert?</h2>
+      <span class="label">Dein Wort</span>
+      <div class="word" id="word"></div>
+      <div class="state" id="stateBox"><span class="label">Zustand:</span><span class="pill st" id="statePill"></span></div>
+      <div class="status run" id="status"><span class="icon">…</span><span id="statusText"></span></div>
+      <p class="path" id="path"></p>
+      <div><button type="button" class="btn" id="reset">Neu starten</button></div>
+
+      <hr>
+      <span class="label">Codetabelle</span>
+      <div class="codes" id="codes"></div>
+
+      <hr>
+      <h2>Wort testen</h2>
+      <p class="hint">Tippe ein Wort aus der Codetabelle ein. Der Automat spielt es Schritt für Schritt ab.</p>
+      <form class="test" id="testForm">
+        <label for="testWord" class="label" style="flex-basis:100%">Wort</label>
+        <input id="testWord" autocomplete="off" spellcheck="false" maxlength="20" placeholder="z. B. maun">
+        <button type="submit" class="btn ghostbtn" id="play">Abspielen</button>
+      </form>
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+  const CODES=[['m','„Versenden und Abholen“ antippen'],['a','Abholcode scannen'],['u','auf dem Bildschirm unterschreiben'],['n','Paket herausnehmen, Fach schließen'],['s','Code auf dem Paket scannen'],['l','Paket ins Fach legen, Fach schließen'],['b','Brief wählen',2],['p','Paket wählen',2],['k','mit Karte bezahlen',2],['e','Brief in den Briefkasten einwerfen',2]];
+  const S2=new Set(['b','p','k','e']);
+  const HW={a:'devScan',s:'devScan',k:'devCard',e:'devMail'};
+  const STATES={
+    S:{name:'Start'}, M:{name:'Menü'}, AC:{name:'Abholcode gescannt'},
+    FA:{name:'Fach offen (Abholung)'}, FO:{name:'Fach offen (Abgabe)'},
+    B:{name:'Brief gewählt',s2:1}, BM:{name:'Briefmarke gedruckt',s2:1},
+    P:{name:'Paket gewählt',s2:1}, PM:{name:'Paketmarke gedruckt',s2:1},
+    F:{name:'Fertig',end:1}
+  };
+  const T={S:{m:'M'},M:{a:'AC',s:'FO',b:'B',p:'P'},AC:{u:'FA'},FA:{n:'F'},FO:{l:'F'},B:{k:'BM'},BM:{e:'F'},P:{k:'PM'},PM:{s:'FO'}};
+  let fachAbhol=5, fachAbgabe=8;
+  function rollFaecher(){ fachAbhol=1+Math.floor(Math.random()*10); do{ fachAbgabe=1+Math.floor(Math.random()*10); }while(fachAbgabe===fachAbhol); }
+  let stage=1,cur='S',word=[],path=['S'],stuck=false,playing=false,last=null;
+  let pickedUp=false,dropped=false,selected=null;
+  const $=id=>document.getElementById(id);
+  const ok=ch=>stage===2||!S2.has(ch);
+
+  // ---------- Grundaufbau ----------
+  function buildFaecher(){
+    const f=$('faecher'); f.innerHTML='';
+    for(let i=1;i<=10;i++){
+      const b=document.createElement('button'); b.type='button';
+      b.className='fach'+(i===10?' big':''); b.id='fach'+i; b.dataset.target='fach'; b.dataset.nr=i;
+      b.setAttribute('aria-label','Fach '+i);
+      const ins=document.createElement('span'); ins.className='inside';
+      const door=document.createElement('span'); door.className='door'; door.textContent=i;
+      b.append(ins,door); f.appendChild(b);
+    }
+  }
+  function buildCodes(){
+    const c=$('codes'); c.innerHTML='';
+    CODES.forEach(([k,t])=>{
+      const d=document.createElement('div'); d.className='code'+(ok(k)?'':' off'); d.id='code-'+k;
+      const key=document.createElement('span'); key.className='key'; key.textContent=k;
+      const s=document.createElement('span'); s.textContent=t;
+      d.append(key,s); c.appendChild(d);
+    });
+  }
+  const ICONS={
+    notice:'<svg viewBox="0 0 54 40" aria-hidden="true"><rect x="3" y="4" width="48" height="32" rx="3" fill="#fff" stroke="#9aa7b3" stroke-width="2"/><rect x="8" y="9" width="18" height="18" fill="#1f2d3a"/><rect x="11" y="12" width="5" height="5" fill="#fff"/><rect x="18" y="19" width="5" height="5" fill="#fff"/><rect x="30" y="11" width="16" height="3" rx="1.5" fill="#d0534a"/><rect x="30" y="17" width="12" height="3" rx="1.5" fill="#9aa7b3"/><rect x="30" y="23" width="14" height="3" rx="1.5" fill="#9aa7b3"/></svg>',
+    parcel:'<svg viewBox="0 0 54 40" aria-hidden="true"><rect x="5" y="6" width="44" height="30" rx="3" fill="#c08a4a"/><rect x="24" y="6" width="6" height="30" fill="#e3c08f"/><rect x="8" y="10" width="13" height="11" fill="#fff"/><rect x="10" y="12" width="9" height="2" fill="#1f2d3a"/><rect x="10" y="16" width="9" height="2" fill="#1f2d3a"/></svg>',
+    letter:'<svg viewBox="0 0 54 40" aria-hidden="true"><rect x="4" y="7" width="46" height="28" rx="2" fill="#fff" stroke="#9aa7b3" stroke-width="2"/><path d="M5 9 L27 24 L49 9" fill="none" stroke="#9aa7b3" stroke-width="2"/><rect x="38" y="11" width="8" height="9" fill="#ffcc00"/></svg>',
+    card:'<svg viewBox="0 0 54 40" aria-hidden="true"><rect x="4" y="6" width="46" height="29" rx="4" fill="#2557b8"/><rect x="4" y="12" width="46" height="5" fill="#1f2d3a"/><rect x="9" y="22" width="9" height="7" rx="1.5" fill="#ffcc00"/></svg>'
+  };
+  function buildTray(){
+    const t=$('tray'); t.innerHTML='';
+    const items=[['notice','Benachrichtigung mit Abholcode'],['parcel','Paket zum Verschicken']];
+    if(stage===2) items.push(['letter','Brief'],['card','Bankkarte']);
+    items.forEach(([id,label])=>{
+      if(id==='parcel' && dropped) return;
+      const d=document.createElement('div'); d.className='item'+(selected===id?' sel':''); d.dataset.item=id; d.tabIndex=0; d.setAttribute('role','button');
+      d.setAttribute('aria-label',label+' – antippen und dann auf das Ziel tippen');
+      d.innerHTML=ICONS[id]; const s=document.createElement('span'); s.textContent=label; d.appendChild(s);
+      attachDrag(d); t.appendChild(d);
+    });
+    if(pickedUp){
+      const d=document.createElement('div'); d.className='item got'; d.innerHTML=ICONS.parcel;
+      const s=document.createElement('span'); s.textContent='Abgeholtes Paket ✓'; d.appendChild(s); t.appendChild(d);
+    }
+  }
+
+  // ---------- Bildschirm ----------
+  function el(tag,cls,text){const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e;}
+  function tbtn(key,label,sec){
+    const b=el('button','tbtn'+(sec?' sec':'')); b.type='button';
+    const k=el('span','tkey',key); b.append(k,document.createTextNode(label));
+    b.addEventListener('click',()=>{ if(!playing) input(key); }); return b;
+  }
+  function screen(){
+    const s=$('screen'); s.innerHTML='';
+    const title=t=>s.appendChild(el('div','scr-title',t));
+    const text=t=>s.appendChild(el('div','scr-text',t));
+    const btns=el('div','scr-btns');
+    if(stuck){
+      title('Eingabe nicht möglich'); text('Der Automat kann mit dieser Eingabe gerade nichts anfangen.');
+      const b=el('button','tbtn sec'); b.type='button'; b.textContent='Neu starten'; b.addEventListener('click',()=>{ if(!playing) reset(); }); btns.appendChild(b);
+    } else switch(cur){
+      case 'S': title('Willkommen!'); text('Berühre den Bildschirm, um zu beginnen.'); btns.appendChild(tbtn('m','Versenden und Abholen')); break;
+      case 'M': title('Was möchtest du tun?'); text('Paket abholen oder abgeben: Halte deinen Abholcode oder dein Paket vor den Scanner.');
+        if(stage===2){ text('Oder kaufe eine Marke:'); btns.append(tbtn('b','Brief – Briefmarke kaufen'),tbtn('p','Paket – Paketmarke kaufen')); } break;
+      case 'AC': title('Code erkannt'); text('Bitte unterschreibe mit dem Finger im Feld und bestätige.');
+        const c=document.createElement('canvas'); c.className='sig'; c.width=440; c.height=148; c.setAttribute('aria-label','Unterschriftenfeld'); s.appendChild(c); sigPad(c);
+        btns.appendChild(tbtn('u','Unterschrift bestätigen')); break;
+      case 'FA': title('Fach '+fachAbhol+' ist offen'); text('Nimm dein Paket aus dem Fach. Berühre dazu das offene Fach.'); break;
+      case 'FO': title('Fach '+fachAbgabe+' ist offen'); text('Lege dein Paket in das offene Fach. Ziehe es dazu auf das Fach.'); break;
+      case 'B': title('Standardbrief'); text('Bitte bezahle: Halte deine Bankkarte an das Kartenterminal.'); break;
+      case 'BM': title('Briefmarke gedruckt'); text('Nimm die Marke aus dem Drucker, klebe sie auf und wirf den Brief in den Briefkasten.'); break;
+      case 'P': title('Paket bis 5 kg'); text('Bitte bezahle: Halte deine Bankkarte an das Kartenterminal.'); break;
+      case 'PM': title('Paketmarke gedruckt'); text('Klebe die Paketmarke auf dein Paket und halte es vor den Scanner.'); break;
+      case 'F': title('Vielen Dank!'); text('Der Vorgang ist abgeschlossen.');
+        const b=el('button','tbtn sec'); b.type='button'; b.textContent='Neuer Vorgang'; b.addEventListener('click',()=>{ if(!playing) reset(); }); btns.appendChild(b); break;
+    }
+    s.appendChild(btns);
+  }
+  function sigPad(c){
+    const ctx=c.getContext('2d'); ctx.lineWidth=4; ctx.lineCap='round'; ctx.strokeStyle='#1f2d3a'; let down=false;
+    const pos=e=>{const r=c.getBoundingClientRect(); return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height];};
+    c.addEventListener('pointerdown',e=>{down=true; c.setPointerCapture(e.pointerId); const [x,y]=pos(e); ctx.beginPath(); ctx.moveTo(x,y);});
+    c.addEventListener('pointermove',e=>{ if(!down) return; const [x,y]=pos(e); ctx.lineTo(x,y); ctx.stroke();});
+    c.addEventListener('pointerup',()=>down=false);
+  }
+
+  // ---------- Darstellung ----------
+  function render(){
+    screen();
+    // Fächer
+    for(let i=1;i<=10;i++){
+      const f=$('fach'+i); f.classList.remove('open'); f.querySelector('.inside').innerHTML='';
+    }
+    const put=nr=>{ $('fach'+nr).querySelector('.inside').appendChild(el('span','parcel')); };
+    if(!pickedUp) put(fachAbhol);
+    if(dropped) put(fachAbgabe);
+    if(!stuck && cur==='FA') $('fach'+fachAbhol).classList.add('open');
+    if(!stuck && cur==='FO') $('fach'+fachAbgabe).classList.add('open');
+    // Drucker
+    const t=$('ticket'); t.innerHTML='';
+    if(!stuck && (cur==='BM'||cur==='PM')) t.appendChild(el('span','ticket',cur==='BM'?'Briefmarke':'Paketmarke'));
+    // Wort
+    const w=$('word'); w.innerHTML='';
+    if(!word.length) w.appendChild(el('span','empty','Noch keine Eingabe'));
+    word.forEach((c,i)=>w.appendChild(el('span','ch'+(stuck&&i===word.length-1?' badch':''),c)));
+    // Zustand
+    const st=STATES[cur], pill=$('statePill'); pill.textContent=st.name; pill.className='pill '+(st.end?'end':'st');
+    const show=$('showState').checked; $('stateBox').hidden=!show;
+    $('path').textContent=show?'Weg: '+path.map(p=>STATES[p].name).join(' → '):'';
+    // Status
+    const s=$('status'),txt=$('statusText'),ic=s.querySelector('.icon'),ww=word.join('');
+    if(stuck){s.className='status bad';ic.textContent='✗';txt.textContent=`Das Wort „${ww}“ wird abgelehnt: Für „${word[word.length-1]}“ gibt es in diesem Zustand keinen Übergang.`;}
+    else if(st.end){s.className='status ok';ic.textContent='✓';txt.textContent=`Endzustand erreicht. Das Wort „${ww}“ wird akzeptiert.`;}
+    else if(!word.length){s.className='status run';ic.textContent='…';txt.textContent='Der Automat wartet auf deine erste Eingabe.';}
+    else {s.className='status run';ic.textContent='…';txt.textContent=`Noch kein Endzustand. Würde das Wort hier enden, wird „${ww}“ nicht akzeptiert.`;}
+    // Codetabelle
+    document.querySelectorAll('.code').forEach(c=>c.classList.toggle('last',c.id==='code-'+last));
+    buildTray();
+  }
+  function flash(ch){ const id=HW[ch]; if(!id) return; const d=$(id); d.classList.remove('lit'); void d.offsetWidth; d.classList.add('lit'); setTimeout(()=>d.classList.remove('lit'),500); }
+  function say(t){ $('msg').textContent=t||''; }
+
+  // ---------- Eingaben ----------
+  function input(ch){
+    if(stuck||cur==='F'||!ok(ch)) return;
+    say(''); word.push(ch); last=ch; flash(ch);
+    let to=(T[cur]||{})[ch]; if(to && stage===1 && STATES[to].s2) to=null;
+    if(!to){ stuck=true; render(); return; }
+    if(ch==='n') pickedUp=true;
+    if(ch==='l') dropped=true;
+    cur=to; path.push(to); render();
+  }
+  function reset(){ rollFaecher(); cur='S'; word=[]; path=['S']; stuck=false; last=null; pickedUp=false; dropped=false; selected=null; say(''); render(); }
+
+  // Gegenstand auf ein Ziel anwenden
+  function apply(item,target){
+    selected=null;
+    if(stuck||cur==='F'){ say('Starte zuerst neu.'); render(); return; }
+    if(target==='scan'){
+      if(item==='notice') return input('a');
+      if(item==='parcel') return input('s');
+      if(item==='letter') return say('Ein Brief wird nicht gescannt. Er kommt in den Briefkasten.'), render();
+      if(item==='card') return say('Die Bankkarte gehört an das Kartenterminal.'), render();
+    }
+    if(target==='card'){ if(item==='card') return input('k'); return say('Am Kartenterminal kannst du nur mit der Bankkarte bezahlen.'), render(); }
+    if(target==='mail'){ if(item==='letter') return input('e'); return say('In den Briefkasten passen nur Briefe.'), render(); }
+    if(target==='fach'){ if(item==='parcel') return input('l'); return say('In das Fach kommt nur ein Paket.'), render(); }
+    render();
+  }
+  // Ziele: Antippen
+  document.querySelectorAll('[data-target]').forEach(t=>{
+    const go=()=>{ if(playing) return; if(selected) apply(selected,t.dataset.target); };
+    t.addEventListener('click',go);
+    t.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } });
+  });
+  // Fächer: Antippen ohne Gegenstand = Paket herausnehmen
+  function bindFaecher(){
+    document.querySelectorAll('.fach').forEach(f=>f.addEventListener('click',()=>{
+      if(playing) return;
+      if(selected){ apply(selected,'fach'); return; }
+      if(stuck||cur==='F'){ say('Starte zuerst neu.'); return; }
+      const nr=+f.dataset.nr;
+      if(cur==='FA' && nr===fachAbhol) return input('n');
+      if(f.classList.contains('open')) return say('Ziehe dein Paket in das Fach.');
+      input('n');
+    }));
+  }
+  // Gegenstände: ziehen oder antippen
+  function attachDrag(d){
+    let sx=0,sy=0,drag=false,ghost=null,lastT=null;
+    const id=d.dataset.item;
+    const targetAt=(x,y)=>{ const e=document.elementFromPoint(x,y); return e?e.closest('[data-target]'):null; };
+    d.addEventListener('pointerdown',e=>{ if(playing) return; sx=e.clientX; sy=e.clientY; drag=false; d.setPointerCapture(e.pointerId); });
+    d.addEventListener('pointermove',e=>{
+      if(!d.hasPointerCapture(e.pointerId)) return;
+      if(!drag && Math.hypot(e.clientX-sx,e.clientY-sy)>6){ drag=true; ghost=d.cloneNode(true); ghost.classList.add('ghost'); document.body.appendChild(ghost); }
+      if(drag){ ghost.style.left=e.clientX+'px'; ghost.style.top=e.clientY+'px';
+        const t=targetAt(e.clientX,e.clientY); if(t!==lastT){ if(lastT) lastT.classList.remove('drop'); if(t) t.classList.add('drop'); lastT=t; } }
+    });
+    const end=e=>{
+      if(ghost){ ghost.remove(); ghost=null; }
+      if(lastT){ lastT.classList.remove('drop'); }
+      if(drag){ const t=targetAt(e.clientX,e.clientY); drag=false; lastT=null; if(t) apply(id,t.dataset.target); }
+      else if(e.type==='pointerup'){ selected = selected===id?null:id; say(selected?'Tippe jetzt auf das Ziel am Automaten.':''); buildTray(); }
+    };
+    d.addEventListener('pointerup',end);
+    d.addEventListener('pointercancel',end);
+    d.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); selected = selected===id?null:id; say(selected?'Wähle jetzt das Ziel am Automaten (Tab, dann Enter).':''); buildTray(); } });
+  }
+
+  // ---------- Stufen, Test, Tastatur ----------
+  function setStage(n){
+    stage=n; $('mode1').setAttribute('aria-pressed',n===1); $('mode2').setAttribute('aria-pressed',n===2);
+    $('modeHint').textContent=n===1?'Stufe 1: Pakete abholen und abgeben. Probiere aus und beobachte, welche Eingaben in welchem Zustand möglich sind.'
+      :'Stufe 2: Zusätzlich kannst du Briefmarken und Paketmarken kaufen. Welche Wege treffen sich?';
+    buildCodes(); reset();
+  }
+  $('mode1').addEventListener('click',()=>{ if(!playing) setStage(1); });
+  $('mode2').addEventListener('click',()=>{ if(!playing) setStage(2); });
+  $('showState').addEventListener('change',render);
+  $('reset').addEventListener('click',()=>{ if(!playing) reset(); });
+  $('testForm').addEventListener('submit',e=>{
+    e.preventDefault(); if(playing) return;
+    const raw=$('testWord').value.toLowerCase().replace(/[^a-z]/g,''); $('testWord').value=raw; if(!raw) return;
+    reset();
+    const bad=[...raw].find(c=>!CODES.some(x=>x[0]===c)||!ok(c));
+    if(bad){ const s=$('status'); s.className='status bad'; s.querySelector('.icon').textContent='✗';
+      $('statusText').textContent=`„${bad}“ gehört in Stufe ${stage} nicht zum Alphabet. Erlaubt sind: ${CODES.map(x=>x[0]).filter(ok).join(', ')}.`; return; }
+    playing=true; $('play').disabled=true;
+    const chars=[...raw]; let i=0; const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const step=()=>{ if(i>=chars.length||stuck){ playing=false; $('play').disabled=false; render(); return; } input(chars[i++]); setTimeout(step,reduce?150:900); };
+    setTimeout(step,300);
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.target.closest('input,textarea,button,[role="button"]')||e.metaKey||e.ctrlKey||e.altKey||playing) return;
+    const k=e.key.toLowerCase(); if(CODES.some(x=>x[0]===k)&&ok(k)) input(k);
+  });
+
+  buildFaecher(); bindFaecher(); setStage(1);
+})();
+</script>
+</body>
+</html>
